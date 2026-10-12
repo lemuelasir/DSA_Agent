@@ -1,0 +1,245 @@
+.cat-stage {
+  position: relative;
+  width: 140px;
+  height: 140px;
+  margin: 0 auto;
+  cursor: pointer;
+  user-select: none;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cat-stage:hover {
+  transform: scale(1.05);
+}
+
+.cat-stage:active {
+  transform: scale(0.96);
+}
+
+.cat-svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  animation: catBob 3s ease-in-out infinite;
+}
+
+/* Animations */
+@keyframes catBob {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+.cat-shadow {
+  fill: rgba(0, 0, 0, 0.2);
+  animation: shadowPulse 3s ease-in-out infinite;
+  transform-origin: 80px 148px;
+}
+
+@keyframes shadowPulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.3;
+  }
+  50% {
+    transform: scale(0.85);
+    opacity: 0.15;
+  }
+}
+
+.cat-tail {
+  fill: #cbd5e1;
+  stroke: #94a3b8;
+  stroke-width: 2;
+  transform-origin: 112px 120px;
+  animation: tailWag 3.5s ease-in-out infinite;
+}
+
+@keyframes tailWag {
+  0%, 100% {
+    transform: rotate(0deg);
+  }
+  25% {
+    transform: rotate(10deg);
+  }
+  75% {
+    transform: rotate(-12deg);
+  }
+}
+
+.cat-body {
+  fill: url(#catBodyGrad);
+}
+
+.cat-head {
+  fill: url(#catBodyGrad);
+  transform-origin: 80px 74px;
+}
+
+.ear-left {
+  transform-origin: 50px 50px;
+  animation: earTwitchLeft 5s infinite;
+}
+
+.ear-right {
+  transform-origin: 110px 50px;
+  animation: earTwitchRight 6s infinite 1s;
+}
+
+@keyframes earTwitchLeft {
+  0%, 92%, 100% {
+    transform: rotate(0deg);
+  }
+  94% {
+    transform: rotate(-8deg);
+  }
+  96% {
+    transform: rotate(3deg);
+  }
+}
+
+@keyframes earTwitchRight {
+  0%, 90%, 100% {
+    transform: rotate(0deg);
+  }
+  93% {
+    transform: rotate(8deg);
+  }
+  96% {
+    transform: rotate(-3deg);
+  }
+}
+
+.cat-blush {
+  fill: #fda4af;
+  opacity: 0.5;
+  transition: opacity 0.3s ease;
+}
+
+.mood-success .cat-blush {
+  opacity: 0.85;
+}
+
+/* Eye Blinking */
+.cat-pupil {
+  fill: #1e293b;
+  transform-origin: center;
+  animation: eyeBlink 4s infinite;
+}
+
+@keyframes eyeBlink {
+  0%, 94%, 100% {
+    transform: scaleY(1);
+  }
+  96% {
+    transform: scaleY(0.1);
+  }
+}
+
+.cat-shine, .cat-shine-small {
+  fill: #ffffff;
+  animation: eyeBlink 4s infinite;
+}
+
+/* Mood Indicators */
+.thought-bubbles {
+  position: absolute;
+  top: -10px;
+  right: -5px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  pointer-events: none;
+}
+
+.thought-bubbles .dot {
+  background: rgba(30, 41, 59, 0.85);
+  border: 1px solid rgba(99, 102, 241, 0.4);
+  color: #a5b4fc;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  animation: floatBubble 2s ease-in-out infinite alternate;
+}
+
+.thought-bubbles .dot-1 {
+  width: 22px;
+  height: 22px;
+  font-size: 12px;
+}
+
+.thought-bubbles .dot-2 {
+  width: 28px;
+  height: 28px;
+  font-size: 14px;
+  margin-left: 10px;
+}
+
+@keyframes floatBubble {
+  0% {
+    transform: translateY(0px) scale(0.95);
+  }
+  100% {
+    transform: translateY(-6px) scale(1.05);
+  }
+}
+
+.success-sparkles {
+  position: absolute;
+  top: -8px;
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  padding: 0 10px;
+  pointer-events: none;
+}
+
+.success-sparkles .sparkle {
+  font-size: 1.25rem;
+  animation: sparkleTwinkle 1.2s ease-in-out infinite alternate;
+}
+
+.sp-2 {
+  animation-delay: 0.5s !important;
+}
+
+@keyframes sparkleTwinkle {
+  0% {
+    transform: scale(0.8) rotate(-10deg);
+    opacity: 0.7;
+  }
+  100% {
+    transform: scale(1.2) rotate(15deg);
+    opacity: 1;
+  }
+}
+
+.helping-badge {
+  position: absolute;
+  bottom: 0px;
+  right: 15px;
+  background: #6366f1;
+  border-radius: 50%;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.5);
+  animation: bounceBadge 1.5s ease-in-out infinite;
+}
+
+@keyframes bounceBadge {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
