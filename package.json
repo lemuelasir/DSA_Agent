@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "backend": ".venv\\Scripts\\python backend/main.py",
     "build": "tsc -b && vite build",
     "start": "electron .",
     "lint": "oxlint",

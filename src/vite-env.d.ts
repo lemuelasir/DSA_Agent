@@ -8,6 +8,7 @@ export interface ElectronAPI {
   minimize: () => void
   close: () => void
   setAlwaysOnTop: (flag: boolean) => void
+  setExpanded: (isExpanded: boolean) => void
   showContextMenu: () => void
   onSetMood: (callback: (mood: string) => void) => void
   onAlwaysOnTopChanged: (callback: (flag: boolean) => void) => void

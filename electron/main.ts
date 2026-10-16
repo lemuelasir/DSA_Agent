@@ -1,6 +1,8 @@
 import { app, BrowserWindow, ipcMain, screen, Menu } from 'electron'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { spawn, type ChildProcess } from 'node:child_process'
+import fs from 'node:fs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -22,6 +24,57 @@ process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL
   : RENDERER_DIST
 
 let mainWindow: BrowserWindow | null = null
+let pythonProcess: ChildProcess | null = null
+
+const appRoot = process.env.APP_ROOT || path.join(__dirname, '..')
+
+function startPythonBackend() {
+  const venvPythonWin = path.join(appRoot, '.venv', 'Scripts', 'python.exe')
+  const venvPythonUnix = path.join(appRoot, '.venv', 'bin', 'python')
+  const pythonPath = fs.existsSync(venvPythonWin)
+    ? venvPythonWin
+    : fs.existsSync(venvPythonUnix)
+    ? venvPythonUnix
+    : 'python'
+
+  const backendDir = path.join(appRoot, 'backend')
+
+  console.log(`[Main Process] Spawning Python FastAPI backend via: ${pythonPath}`)
+  try {
+    pythonProcess = spawn(
+      pythonPath,
+      ['-m', 'uvicorn', 'main:app', '--host', '127.0.0.1', '--port', '8000'],
+      {
+        cwd: backendDir,
+        env: { ...process.env, PYTHONUNBUFFERED: '1', PYTHONIOENCODING: 'utf-8' },
+        stdio: ['ignore', 'pipe', 'pipe'],
+      }
+    )
+
+    pythonProcess.stdout?.on('data', (data) => {
+      console.log(`[Python Backend]: ${data.toString().trim()}`)
+    })
+
+    pythonProcess.stderr?.on('data', (data) => {
+      console.log(`[Python Backend Error]: ${data.toString().trim()}`)
+    })
+
+    pythonProcess.on('exit', (code) => {
+      console.log(`[Python Backend] Exited with code ${code}`)
+      pythonProcess = null
+    })
+  } catch (err) {
+    console.error('[Main Process] Failed to spawn Python backend:', err)
+  }
+}
+
+function stopPythonBackend() {
+  if (pythonProcess) {
+    console.log('[Main Process] Terminating Python backend...')
+    pythonProcess.kill()
+    pythonProcess = null
+  }
+}
 
 function createWindow() {
   const primaryDisplay = screen.getPrimaryDisplay()
@@ -87,6 +140,7 @@ ipcMain.on('window-minimize', () => {
 
 ipcMain.on('window-close', () => {
   console.log('[Main Process] Received window-close IPC - terminating app')
+  stopPythonBackend()
   if (mainWindow) {
     mainWindow.destroy()
   }
@@ -96,6 +150,53 @@ ipcMain.on('window-close', () => {
 ipcMain.on('window-set-always-on-top', (_event, flag: boolean) => {
   console.log(`[Main Process] Set always on top: ${flag}`)
   mainWindow?.setAlwaysOnTop(flag, flag ? 'screen-saver' : 'normal')
+})
+
+// Dynamic window resizing between compact Cat mode and expanded Assistant Panel (opens below cat)
+ipcMain.on('window-set-expanded', (_event, isExpanded: boolean) => {
+  if (!mainWindow) return
+  const [currentX, currentY] = mainWindow.getPosition()
+  const primaryDisplay = screen.getPrimaryDisplay()
+  const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize
+
+  const compactWidth = 220
+  const compactHeight = 240
+  const expandedWidth = 400
+  const expandedHeight = 680
+
+  const targetWidth = isExpanded ? expandedWidth : compactWidth
+  const targetHeight = isExpanded ? expandedHeight : compactHeight
+
+  let newX = currentX
+  let newY = currentY
+
+  if (isExpanded) {
+    // When expanding, shift window upwards so panel opens cleanly below the cat without falling off-screen
+    const heightDiff = expandedHeight - compactHeight
+    newY = Math.max(10, currentY - heightDiff)
+    const widthDiff = Math.round((expandedWidth - compactWidth) / 2)
+    newX = Math.max(10, currentX - widthDiff)
+
+    if (newX + targetWidth > screenWidth) {
+      newX = Math.max(10, screenWidth - targetWidth - 20)
+    }
+    if (newY + targetHeight > screenHeight) {
+      newY = Math.max(10, screenHeight - targetHeight - 20)
+    }
+  } else {
+    // When collapsing, return downwards so the cat anchors back to its original desktop location
+    const heightDiff = expandedHeight - compactHeight
+    newY = Math.min(screenHeight - compactHeight - 20, currentY + heightDiff)
+    const widthDiff = Math.round((expandedWidth - compactWidth) / 2)
+    newX = Math.min(screenWidth - compactWidth - 20, currentX + widthDiff)
+  }
+
+  mainWindow.setBounds({
+    x: Math.round(newX),
+    y: Math.round(newY),
+    width: targetWidth,
+    height: targetHeight,
+  })
 })
 
 // Right-click context menu
@@ -139,6 +240,7 @@ ipcMain.on('show-context-menu', () => {
     {
       label: '✕ Quit Companion',
       click: () => {
+        stopPythonBackend()
         if (mainWindow) mainWindow.destroy()
         app.quit()
       },
@@ -147,8 +249,14 @@ ipcMain.on('show-context-menu', () => {
   contextMenu.popup({ window: mainWindow })
 })
 
+// Clean up child processes on app quit
+app.on('will-quit', () => {
+  stopPythonBackend()
+})
+
 // Quit when all windows are closed, except on macOS
 app.on('window-all-closed', () => {
+  stopPythonBackend()
   if (process.platform !== 'darwin') {
     app.quit()
     mainWindow = null
@@ -161,4 +269,7 @@ app.on('activate', () => {
   }
 })
 
-app.whenReady().then(createWindow)
+app.whenReady().then(() => {
+  createWindow()
+  startPythonBackend()
+})

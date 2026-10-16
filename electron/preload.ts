@@ -18,6 +18,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   setAlwaysOnTop: (flag: boolean) => {
     ipcRenderer.send('window-set-always-on-top', flag)
   },
+  setExpanded: (isExpanded: boolean) => {
+    ipcRenderer.send('window-set-expanded', isExpanded)
+  },
   showContextMenu: () => {
     ipcRenderer.send('show-context-menu')
   },

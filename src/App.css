@@ -1,26 +1,48 @@
-/* Pure Desktop Companion - Just The Cat */
+/* Pure Desktop Companion & Assistant */
 
-.companion-wrapper {
+.companion-app {
   width: 100vw;
   height: 100vh;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: space-between;
-  padding: 6px;
-  position: relative;
   user-select: none;
   background: transparent !important;
   box-sizing: border-box;
+  overflow: hidden;
 }
 
-/* Floating Toolbar: Pure button container without ANY drag regions */
+.companion-app.compact {
+  justify-content: space-between;
+  padding: 6px;
+}
+
+.companion-app.expanded {
+  padding: 4px 10px 10px 10px;
+  gap: 4px;
+}
+
+/* Cat Section: Sits at the top always */
+.cat-section {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.companion-app.expanded .cat-section .cat-stage {
+  transform: scale(0.88);
+  margin-bottom: -6px;
+}
+
+/* Floating Toolbar */
 .floating-toolbar {
   -webkit-app-region: no-drag !important;
-  app-region: no-drag !important;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   background: rgba(15, 23, 42, 0.94);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
@@ -34,7 +56,6 @@
 
 .mini-btn {
   -webkit-app-region: no-drag !important;
-  app-region: no-drag !important;
   background: rgba(255, 255, 255, 0.08);
   border: 1px solid rgba(255, 255, 255, 0.12);
   color: #e2e8f0;
@@ -62,6 +83,18 @@
   transform: scale(0.92);
 }
 
+.mini-btn.chat-btn {
+  background: rgba(99, 102, 241, 0.25);
+  border-color: #6366f1;
+  color: #c7d2fe;
+}
+
+.mini-btn.chat-btn.active {
+  background: #6366f1;
+  color: #ffffff;
+  box-shadow: 0 0 10px rgba(99, 102, 241, 0.5);
+}
+
 .mini-btn.pin.active {
   color: #818cf8;
   background: rgba(99, 102, 241, 0.35);
@@ -76,6 +109,7 @@
 
 /* Floating Speech Bubble */
 .speech-bubble {
+  -webkit-app-region: no-drag !important;
   background: rgba(15, 23, 42, 0.92);
   backdrop-filter: blur(12px);
   border: 1px solid rgba(99, 102, 241, 0.45);
@@ -89,7 +123,15 @@
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
   margin-top: 2px;
   z-index: 40;
-  pointer-events: none;
+  pointer-events: auto;
+  cursor: pointer;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.speech-bubble:hover {
+  transform: scale(1.04);
+  background: rgba(30, 41, 59, 0.95);
+  border-color: #818cf8;
 }
 
 .speech-bubble::after {
@@ -105,10 +147,9 @@
   width: 0;
 }
 
-/* The Draggable Cat Area: All dragging happens directly on the cat */
+/* Cat Drag Area */
 .cat-area {
   -webkit-app-region: drag !important;
-  app-region: drag !important;
   cursor: grab;
   position: relative;
   display: flex;
@@ -120,4 +161,25 @@
 
 .cat-area:active {
   cursor: grabbing;
+}
+
+/* Panel Section: Opens smoothly directly below the cat */
+.panel-section {
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  animation: panelSlideDown 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes panelSlideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }

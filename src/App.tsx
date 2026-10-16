@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { FloatingCat, type CatMood } from './components/FloatingCat'
+import { AssistantPanel } from './components/AssistantPanel'
 import './App.css'
 
 export default function App() {
@@ -7,6 +8,7 @@ export default function App() {
   const [isAlwaysOnTop, setIsAlwaysOnTop] = useState<boolean>(true)
   const [petCount, setPetCount] = useState<number>(0)
   const [showSpeech, setShowSpeech] = useState<boolean>(true)
+  const [isExpanded, setIsExpanded] = useState<boolean>(false)
 
   const speechTimeoutRef = useRef<number | null>(null)
 
@@ -20,7 +22,7 @@ export default function App() {
   // Speech bubble messages
   const speechMessages: Record<CatMood, string> = {
     idle: petCount === 0 
-      ? 'Meow! Drag me anywhere!' 
+      ? (isExpanded ? 'Ready for DSA questions!' : 'Meow! Click me to open the assistant!') 
       : `Purr... Petted ${petCount} time${petCount > 1 ? 's' : ''}! 😸`,
     thinking: 'Analyzing time complexity O(N)... 🤔',
     helping: 'Ready to debug your LeetCode problem! 🐾',
@@ -59,6 +61,15 @@ export default function App() {
       })
     }
   }, [])
+
+  // Toggle Assistant Panel expansion (opens panel below the cat)
+  const toggleExpanded = (expand?: boolean) => {
+    const nextExpanded = expand !== undefined ? expand : !isExpanded
+    setIsExpanded(nextExpanded)
+    if (window.electronAPI?.setExpanded) {
+      window.electronAPI.setExpanded(nextExpanded)
+    }
+  }
 
   // Cycle mood directly
   const cycleMood = () => {
@@ -105,64 +116,90 @@ export default function App() {
 
   return (
     <div
-      className="companion-wrapper"
+      className={`companion-app ${isExpanded ? 'expanded' : 'compact'}`}
       onContextMenu={handleContextMenu}
     >
-      {/* Mini Floating Pill Toolbar (100% interactive buttons, zero drag interference) */}
-      <div className="floating-toolbar">
-        <button
-          type="button"
-          className="mini-btn"
-          onPointerDown={cycleMood}
-          onClick={cycleMood}
-          title={`Mood: ${mood} (Click to change expression)`}
+      {/* 1. Cat Section (Always perched on top!) */}
+      <div className="cat-section">
+        {/* Mini Floating Pill Toolbar */}
+        <div className="floating-toolbar">
+          <button
+            type="button"
+            className={`mini-btn chat-btn ${isExpanded ? 'active' : ''}`}
+            onPointerDown={() => toggleExpanded()}
+            onClick={() => toggleExpanded()}
+            title={isExpanded ? 'Collapse Panel' : 'Open DSA Assistant Panel'}
+          >
+            {isExpanded ? '▼' : '💬'}
+          </button>
+          <button
+            type="button"
+            className="mini-btn"
+            onPointerDown={cycleMood}
+            onClick={cycleMood}
+            title={`Mood: ${mood} (Click to change expression)`}
+          >
+            {moodIcons[mood]}
+          </button>
+          <button
+            type="button"
+            className={`mini-btn pin ${isAlwaysOnTop ? 'active' : ''}`}
+            onPointerDown={toggleAlwaysOnTop}
+            onClick={toggleAlwaysOnTop}
+            title={isAlwaysOnTop ? 'Always on Top: ON' : 'Always on Top: OFF'}
+          >
+            📌
+          </button>
+          <button
+            type="button"
+            className="mini-btn"
+            onPointerDown={handleMinimize}
+            onClick={handleMinimize}
+            title="Minimize to taskbar"
+          >
+            –
+          </button>
+          <button
+            type="button"
+            className="mini-btn close"
+            onPointerDown={handleClose}
+            onClick={handleClose}
+            title="Quit Companion"
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* Floating Speech Bubble */}
+        {showSpeech && (
+          <div
+            className="speech-bubble"
+            onClick={() => toggleExpanded(!isExpanded)}
+            title="Click to toggle Assistant"
+          >
+            {speechMessages[mood]}
+          </div>
+        )}
+
+        {/* The Animated Draggable Cat */}
+        <div
+          className="cat-area"
+          onDoubleClick={() => toggleExpanded()}
+          title="Drag the cat anywhere! Double-click to toggle Assistant."
         >
-          {moodIcons[mood]}
-        </button>
-        <button
-          type="button"
-          className={`mini-btn pin ${isAlwaysOnTop ? 'active' : ''}`}
-          onPointerDown={toggleAlwaysOnTop}
-          onClick={toggleAlwaysOnTop}
-          title={isAlwaysOnTop ? 'Always on Top: ON' : 'Always on Top: OFF'}
-        >
-          📌
-        </button>
-        <button
-          type="button"
-          className="mini-btn"
-          onPointerDown={handleMinimize}
-          onClick={handleMinimize}
-          title="Minimize to taskbar"
-        >
-          –
-        </button>
-        <button
-          type="button"
-          className="mini-btn close"
-          onPointerDown={handleClose}
-          onClick={handleClose}
-          title="Quit Companion"
-        >
-          ✕
-        </button>
+          <FloatingCat mood={mood} onCatClick={() => toggleExpanded()} />
+        </div>
       </div>
 
-      {/* Floating Speech Bubble */}
-      {showSpeech && (
-        <div className="speech-bubble">
-          {speechMessages[mood]}
+      {/* 2. Assistant Panel (Opens directly below the cat!) */}
+      {isExpanded && (
+        <div className="panel-section">
+          <AssistantPanel
+            onCollapse={() => toggleExpanded(false)}
+            onMoodChange={(newMood) => setMood(newMood)}
+          />
         </div>
       )}
-
-      {/* The Pure Floating Cat Area: Native OS Dragging */}
-      <div
-        className="cat-area"
-        onDoubleClick={cycleMood}
-        title="Drag the cat anywhere! Right-click for options."
-      >
-        <FloatingCat mood={mood} />
-      </div>
     </div>
   )
 }
