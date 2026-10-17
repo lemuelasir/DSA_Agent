@@ -139,7 +139,7 @@ export const AssistantPanel: React.FC<AssistantPanelProps> = ({
     if (res.success) {
       setKeySaveFeedback({
         type: 'success',
-        message: '✅ API key saved successfully! Gemini 2.5 Flash is active.',
+        message: '✅ API key saved successfully! Gemini 3.8 Flash is active.',
       })
       setApiKeyInput('')
       const statusRes = await getAIStatus(2500)
@@ -313,7 +313,7 @@ export const AssistantPanel: React.FC<AssistantPanelProps> = ({
                     title={`AI Active: ${aiStatus.model}. Click to configure key.`}
                   >
                     <span className="status-sparkle">✨</span>
-                    Gemini 2.5
+                    {aiStatus.model ? (aiStatus.model.includes('3.8') ? 'Gemini 3.8' : 'Gemini AI') : 'Gemini AI'}
                   </button>
                 ) : (
                   <button
@@ -416,7 +416,7 @@ export const AssistantPanel: React.FC<AssistantPanelProps> = ({
                     {msg.level && <span className="meta-badge-level">L{msg.level}</span>}
                     {msg.model ? (
                       <span className="meta-badge-gemini">
-                        ✨ {msg.model.includes('gemini') ? 'GEMINI 2.5' : msg.model.toUpperCase()}
+                        ✨ {msg.model.includes('gemini') ? (msg.model.includes('3.8') ? 'GEMINI 3.8' : 'GEMINI') : msg.model.toUpperCase()}
                       </span>
                     ) : msg.source === 'python-backend' ? (
                       <span className="meta-badge-python">🐍 FASTAPI</span>
@@ -528,7 +528,7 @@ export const AssistantPanel: React.FC<AssistantPanelProps> = ({
 
             <div className="modal-body">
               <p className="modal-desc">
-                Byte the Cat uses <strong>Google Gemini 2.5 Flash</strong> for real-time Socratic DSA guidance.
+                Byte the Cat uses <strong>Google Gemini 3.8 Flash</strong> for real-time Socratic DSA guidance.
               </p>
 
               <div className="key-status-indicator">

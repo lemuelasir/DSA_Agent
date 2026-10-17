@@ -75,7 +75,7 @@ def generate_dsa_assistance(prompt: str, mode: str, level: int) -> dict:
     If no API key is provided, returns helpful configuration instructions.
     """
     client = get_gemini_client()
-    model_name = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+    model_name = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
 
     if not client:
         # Graceful fallback explaining how to enable live AI

@@ -77,7 +77,7 @@ def get_ai_status():
     return AIStatusResponse(
         configured=client is not None,
         provider="Google Gemini",
-        model=os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
+        model=os.getenv("GEMINI_MODEL", "gemini-3.8-flash"),
     )
 
 
@@ -97,7 +97,7 @@ def configure_api_key(req: ConfigureKeyRequest):
     env_path = Path(__file__).parent / ".env"
     try:
         with open(env_path, "w", encoding="utf-8") as f:
-            f.write(f"# Auto-configured by DSA Companion\nGEMINI_API_KEY={key}\nGEMINI_MODEL=gemini-2.5-flash\n")
+            f.write(f"# Auto-configured by DSA Companion\nGEMINI_API_KEY={key}\nGEMINI_MODEL=gemini-3.8-flash\n")
     except Exception as e:
         print(f"[Backend] Warning saving .env: {e}")
 
