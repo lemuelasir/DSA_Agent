@@ -12,6 +12,8 @@ export interface ElectronAPI {
   showContextMenu: () => void
   onSetMood: (callback: (mood: string) => void) => void
   onAlwaysOnTopChanged: (callback: (flag: boolean) => void) => void
+  captureScreen: () => Promise<string | null>
+  getDesktopIdleSeconds?: () => Promise<number>
 }
 
 declare global {

@@ -12,6 +12,9 @@ export interface ChatMessage {
   isMock?: boolean
   source?: 'python-backend' | 'mock-engine'
   model?: string
+  code?: string
+  language?: string
+  error?: string
   isError?: boolean
 }
 

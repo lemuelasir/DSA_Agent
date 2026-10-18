@@ -72,7 +72,10 @@ export async function sendBackendChat(
   prompt: string,
   mode: AssistantMode,
   level: AssistanceLevel,
-  timeoutMs = 8000
+  code?: string,
+  language = 'python',
+  error?: string,
+  timeoutMs = 15000
 ): Promise<ApiResponse<BackendChatResponse>> {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), timeoutMs)
@@ -81,7 +84,14 @@ export async function sendBackendChat(
     const res = await fetch(`${BACKEND_URL}/api/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt, mode, level }),
+      body: JSON.stringify({
+        prompt,
+        mode,
+        level,
+        code: code?.trim() || null,
+        language,
+        error: error?.trim() || null,
+      }),
       signal: controller.signal,
     })
     clearTimeout(timer)
@@ -185,3 +195,58 @@ export async function configureApiKey(
     return { success: false, error: message }
   }
 }
+
+export interface ScreenAnalysis {
+  detected: boolean
+  is_coding_context?: boolean
+  has_error: boolean
+  is_stuck?: boolean
+  is_accepted?: boolean
+  problem_name?: string
+  error_type?: string
+  error_summary?: string
+  mood: 'idle' | 'thinking' | 'helping' | 'success'
+  cat_speech: string
+  detailed_hint: string
+  suggested_prompt?: string
+}
+
+export interface ScreenAnalysisResponse {
+  status: string
+  analysis: ScreenAnalysis
+  model?: string
+}
+
+/**
+ * Send desktop screen frame to Gemini Vision for DSA problem and error detection
+ */
+export async function analyzeScreen(
+  imageBase64: string,
+  isIdleCheck = false,
+  timeoutMs = 15000
+): Promise<ApiResponse<ScreenAnalysisResponse>> {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+
+  try {
+    const res = await fetch(`${BACKEND_URL}/api/analyze-screen`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image: imageBase64, is_idle_check: isIdleCheck }),
+      signal: controller.signal,
+    })
+    clearTimeout(timer)
+
+    if (!res.ok) {
+      return { success: false, error: `HTTP ${res.status}` }
+    }
+
+    const data: ScreenAnalysisResponse = await res.json()
+    return { success: true, data }
+  } catch (err: unknown) {
+    clearTimeout(timer)
+    const message = err instanceof Error ? err.message : 'Screen vision analysis failed'
+    return { success: false, error: message }
+  }
+}
+

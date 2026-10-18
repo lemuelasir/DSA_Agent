@@ -30,4 +30,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onAlwaysOnTopChanged: (callback: (flag: boolean) => void) => {
     ipcRenderer.on('always-on-top-changed', (_event, flag) => callback(flag))
   },
+  captureScreen: async (): Promise<string | null> => {
+    return ipcRenderer.invoke('screen-capture')
+  },
+  getDesktopIdleSeconds: async (): Promise<number> => {
+    return ipcRenderer.invoke('get-desktop-idle-seconds')
+  },
 })

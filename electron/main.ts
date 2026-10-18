@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, screen, Menu } from 'electron'
+import { app, BrowserWindow, ipcMain, screen, Menu, desktopCapturer } from 'electron'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { spawn, type ChildProcess } from 'node:child_process'
@@ -197,6 +197,51 @@ ipcMain.on('window-set-expanded', (_event, isExpanded: boolean) => {
     width: targetWidth,
     height: targetHeight,
   })
+})
+
+// Desktop cursor tracking to detect when student is stuck or inactive across OS
+let lastCursorPos = { x: 0, y: 0 }
+let lastDesktopActivityTime = Date.now()
+
+setInterval(() => {
+  try {
+    const pos = screen.getCursorScreenPoint()
+    if (pos.x !== lastCursorPos.x || pos.y !== lastCursorPos.y) {
+      lastCursorPos = pos
+      lastDesktopActivityTime = Date.now()
+    }
+  } catch {
+    // Ignore occasional screen query errors
+  }
+}, 1000)
+
+ipcMain.handle('get-desktop-idle-seconds', () => {
+  return Math.round((Date.now() - lastDesktopActivityTime) / 1000)
+})
+
+// Desktop screen capture for Vision AI
+ipcMain.handle('screen-capture', async () => {
+  try {
+    const primaryDisplay = screen.getPrimaryDisplay()
+    const { width, height } = primaryDisplay.size
+    // Higher crisp resolution (up to 1920x1080) so LeetCode test cases and code are clearly readable by Gemini Vision
+    const targetWidth = Math.max(1280, Math.min(width, 1920))
+    const targetHeight = Math.max(720, Math.min(height, 1080))
+
+    const sources = await desktopCapturer.getSources({
+      types: ['screen'],
+      thumbnailSize: {
+        width: targetWidth,
+        height: targetHeight,
+      },
+    })
+    if (sources.length > 0) {
+      return sources[0].thumbnail.toDataURL()
+    }
+  } catch (err) {
+    console.error('[Main Process] desktopCapturer error:', err)
+  }
+  return null
 })
 
 // Right-click context menu

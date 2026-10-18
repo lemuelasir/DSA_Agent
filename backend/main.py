@@ -1,12 +1,19 @@
 import os
+import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Literal, Optional
+
+# Ensure backend directory is in sys.path regardless of execution CWD
+backend_dir = str(Path(__file__).parent)
+if backend_dir not in sys.path:
+    sys.path.insert(0, backend_dir)
+
 from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-from ai_engine import generate_dsa_assistance, get_gemini_client
+from ai_engine import generate_dsa_assistance, get_gemini_client, analyze_screen_dsa
 
 app = FastAPI(
     title="DSA Companion AI Backend",
@@ -42,11 +49,19 @@ class ConfigureKeyRequest(BaseModel):
 
 
 class ChatRequest(BaseModel):
-    prompt: str = Field(..., min_length=1, description="User question, error message, or code")
+    prompt: str = Field(..., min_length=1, description="User question or primary guidance query")
     mode: Literal["hint", "debug", "testcase", "learn"] = Field(
         default="hint", description="Assistance mode"
     )
     level: int = Field(default=1, ge=1, le=4, description="Assistance depth (1 to 4)")
+    code: Optional[str] = Field(default=None, description="Optional code snippet to debug or analyze")
+    language: Optional[str] = Field(default="python", description="Programming language of snippet")
+    error: Optional[str] = Field(default=None, description="Optional compiler error, stack trace, or test failure")
+
+
+class AnalyzeScreenRequest(BaseModel):
+    image: str = Field(..., description="Base64 encoded screenshot data URL or raw base64")
+    is_idle_check: bool = Field(default=False, description="Whether this analysis was triggered due to idle inactivity")
 
 
 class ChatResponse(BaseModel):
@@ -122,7 +137,14 @@ def handle_chat(req: ChatRequest):
         )
 
     # Generate response via AI engine
-    result = generate_dsa_assistance(clean_prompt, req.mode, req.level)
+    result = generate_dsa_assistance(
+        prompt=clean_prompt,
+        mode=req.mode,
+        level=req.level,
+        code=req.code.strip() if req.code else None,
+        language=req.language.strip() if req.language else "python",
+        error=req.error.strip() if req.error else None,
+    )
 
     return ChatResponse(
         status=result["status"],
@@ -133,6 +155,17 @@ def handle_chat(req: ChatRequest):
         model=result.get("model"),
         timestamp=datetime.now().strftime("%I:%M %p"),
     )
+
+
+@app.post("/api/analyze-screen")
+def handle_analyze_screen(req: AnalyzeScreenRequest):
+    """Analyze a screenshot of the user's desktop with Gemini Vision."""
+    if not req.image.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Screenshot image data cannot be empty.",
+        )
+    return analyze_screen_dsa(req.image, is_idle_check=req.is_idle_check)
 
 
 if __name__ == "__main__":
