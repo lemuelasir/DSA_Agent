@@ -158,20 +158,29 @@
   font-weight: 500;
   color: #f1f5f9;
   text-align: center;
-  max-width: 260px;
+  max-width: 250px;
+  width: 90%;
   white-space: normal;
   line-height: 1.38;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.55);
   margin-top: 3px;
   z-index: 40;
   pointer-events: auto;
-  cursor: pointer;
+  cursor: default;
   transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), background 0.15s ease, border-color 0.15s ease;
   animation: popSpeechBubble 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .speech-bubble:hover {
-  transform: scale(1.03);
+  transform: scale(1.02);
+}
+
+.speech-bubble.is-hint {
+  background: rgba(26, 16, 37, 0.96);
+  border: 1.5px solid #a855f7;
+  box-shadow: 0 4px 22px rgba(168, 85, 247, 0.4), 0 0 14px rgba(168, 85, 247, 0.25);
+  color: #f3e8ff;
+  animation: popSpeechBubble 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .speech-bubble.has-alert {
@@ -209,6 +218,28 @@
   margin-bottom: 4px;
 }
 
+.bubble-badge.hint {
+  background: rgba(168, 85, 247, 0.25);
+  color: #d8b4fe;
+  border: 1px solid rgba(168, 85, 247, 0.45);
+}
+
+.bubble-badge.topic {
+  background: rgba(56, 189, 248, 0.2);
+  color: #7dd3fc;
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bubble-badge.live {
+  background: rgba(99, 102, 241, 0.2);
+  color: #a5b4fc;
+  border: 1px solid rgba(99, 102, 241, 0.35);
+}
+
 .bubble-badge.alert {
   background: rgba(244, 63, 94, 0.25);
   color: #fda4af;
@@ -231,20 +262,102 @@
   font-size: 0.72rem;
   line-height: 1.35;
   color: inherit;
+  word-break: break-word;
 }
 
-.bubble-cta {
-  font-size: 0.63rem;
+/* Bubble Action Buttons */
+.bubble-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+
+.bubble-action-btn {
+  -webkit-app-region: no-drag !important;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 9999px;
+  color: #e2e8f0;
+  font-size: 0.62rem;
   font-weight: 700;
-  color: #a5b4fc;
-  margin-top: 5px;
-  opacity: 0.95;
-  transition: opacity 0.15s ease;
+  padding: 3px 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  pointer-events: auto !important;
 }
 
-.speech-bubble:hover .bubble-cta {
-  opacity: 1;
-  text-decoration: underline;
+.bubble-action-btn:hover {
+  transform: translateY(-1px);
+}
+
+.bubble-action-btn:active {
+  transform: scale(0.95);
+}
+
+.bubble-action-btn.hint-btn {
+  background: rgba(245, 158, 11, 0.2);
+  border-color: rgba(245, 158, 11, 0.5);
+  color: #fde68a;
+}
+
+.bubble-action-btn.hint-btn:hover {
+  background: rgba(245, 158, 11, 0.35);
+  color: #ffffff;
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.4);
+}
+
+.bubble-action-btn.live-btn {
+  background: rgba(99, 102, 241, 0.2);
+  border-color: rgba(99, 102, 241, 0.5);
+  color: #c7d2fe;
+}
+
+.bubble-action-btn.live-btn:hover {
+  background: rgba(99, 102, 241, 0.35);
+  color: #ffffff;
+}
+
+.bubble-action-btn.verify-btn {
+  background: rgba(16, 185, 129, 0.15);
+  border-color: rgba(16, 185, 129, 0.4);
+  color: #6ee7b7;
+}
+
+.bubble-action-btn.verify-btn:hover {
+  background: rgba(16, 185, 129, 0.3);
+  color: #ffffff;
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.4);
+}
+
+/* Toolbar mini buttons additions */
+.mini-btn.hint-tool-btn {
+  background: rgba(245, 158, 11, 0.15);
+  border-color: rgba(245, 158, 11, 0.35);
+  color: #fbbf24;
+}
+
+.mini-btn.hint-tool-btn.active {
+  background: #f59e0b;
+  color: #ffffff;
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.5);
+}
+
+.mini-btn.verify-panel-btn {
+  background: rgba(16, 185, 129, 0.18);
+  border-color: #10b981;
+  color: #a7f3d0;
+}
+
+.mini-btn.verify-panel-btn.active {
+  background: #10b981;
+  color: #ffffff;
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.55);
 }
 
 @keyframes popSpeechBubble {

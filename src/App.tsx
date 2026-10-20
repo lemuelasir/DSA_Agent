@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { FloatingCat, type CatMood } from './components/FloatingCat'
 import { AssistantPanel } from './components/AssistantPanel'
 import { analyzeScreen, type ScreenAnalysis } from './services/api'
@@ -30,7 +30,7 @@ function playCompanionChime(type: 'alert' | 'nudge' | 'success') {
       osc.start(now)
       osc.stop(now + 0.45)
     } else if (type === 'nudge') {
-      // Soft pondering tone for stuck detector: A4 -> E5
+      // Soft pondering tone for hint/nudge: A4 -> E5
       osc.type = 'triangle'
       osc.frequency.setValueAtTime(440, now)
       osc.frequency.setValueAtTime(659.25, now + 0.15)
@@ -62,14 +62,12 @@ export default function App() {
   const [showSpeech, setShowSpeech] = useState<boolean>(true)
   const [isExpanded, setIsExpanded] = useState<boolean>(false)
 
-  // Screen Watcher & Vision States - Enabled by default so Byte watches your code
+  // Screen Watcher & Vision States - Continuous 10s commentary
   const [isWatching, setIsWatching] = useState<boolean>(true)
   const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false)
+  const [bubbleMode, setBubbleMode] = useState<'observation' | 'hint'>('observation')
   const [customSpeech, setCustomSpeech] = useState<string | null>(null)
   const [screenAlertData, setScreenAlertData] = useState<ScreenAnalysis | null>(null)
-
-  const speechTimeoutRef = useRef<number | null>(null)
-  const lastActiveTimestampRef = useRef<number>(Date.now())
 
   const moodIcons: Record<CatMood, string> = {
     idle: '💤',
@@ -82,51 +80,16 @@ export default function App() {
   const speechMessages: Record<CatMood, string> = {
     idle:
       petCount === 0
-        ? isExpanded
-          ? 'Ready for DSA questions!'
-          : 'Meow! Click me or 💬 to open the assistant!'
+        ? 'Meow! Watching your screen every 25s! 🐾'
         : `Purr... Petted ${petCount} time${petCount > 1 ? 's' : ''}! 😸`,
-    thinking: 'Analyzing time complexity O(N)... 🤔',
-    helping: 'Ready to debug your LeetCode problem! 🐾',
+    thinking: 'Pondering your algorithm logic... 🤔',
+    helping: 'I spotted a testcase failure or edge case! 🐾',
     success: 'Accepted! Beats 100%! 🎉',
   }
 
   const activeSpeechText = customSpeech || speechMessages[mood]
 
-  // Track window activity as fallback
-  useEffect(() => {
-    const handleActivity = () => {
-      lastActiveTimestampRef.current = Date.now()
-    }
-    window.addEventListener('mousemove', handleActivity)
-    window.addEventListener('keydown', handleActivity)
-    return () => {
-      window.removeEventListener('mousemove', handleActivity)
-      window.removeEventListener('keydown', handleActivity)
-    }
-  }, [])
-
-  // Auto-hide speech bubble (longer if there is an active alert)
-  useEffect(() => {
-    if (!showSpeech) return
-
-    if (speechTimeoutRef.current) {
-      window.clearTimeout(speechTimeoutRef.current)
-    }
-    const hideDuration = screenAlertData?.has_error ? 18000 : screenAlertData?.is_stuck ? 14000 : 7000
-    speechTimeoutRef.current = window.setTimeout(() => {
-      setShowSpeech(false)
-      setCustomSpeech(null)
-    }, hideDuration)
-
-    return () => {
-      if (speechTimeoutRef.current) {
-        window.clearTimeout(speechTimeoutRef.current)
-      }
-    }
-  }, [showSpeech, mood, petCount, customSpeech, screenAlertData])
-
-  // Screen Analysis Worker
+  // Continuous Screen Analysis Worker
   const performScreenAnalysis = useCallback(
     async (isIdle = false) => {
       if (!window.electronAPI?.captureScreen || isAnalyzing) return
@@ -142,44 +105,39 @@ export default function App() {
         const res = await analyzeScreen(base64Img, isIdle)
         if (res.success && res.data.status === 'success') {
           const analysis = res.data.analysis
+          setScreenAlertData(analysis)
+          setMood(analysis.mood || (analysis.has_error ? 'helping' : analysis.is_accepted ? 'success' : 'idle'))
+
+          // If user is currently looking at observation, update with fresh commentary
+          if (bubbleMode === 'observation') {
+            setCustomSpeech(analysis.cat_speech)
+          } else if (bubbleMode === 'hint' && analysis.detailed_hint) {
+            setCustomSpeech(`💡 ${analysis.detailed_hint}`)
+          }
+
+          setShowSpeech(true)
 
           if (analysis.has_error) {
-            // Wrong test case or execution error
-            setMood('helping')
-            setCustomSpeech(analysis.cat_speech)
-            setScreenAlertData(analysis)
-            setShowSpeech(true)
             playCompanionChime('alert')
           } else if (analysis.is_accepted) {
-            // Solution passed all test cases!
-            setMood('success')
-            setCustomSpeech(analysis.cat_speech)
-            setScreenAlertData(analysis)
-            setShowSpeech(true)
             playCompanionChime('success')
-          } else if (isIdle || analysis.is_stuck) {
-            // Taking too long or stuck on logic
-            setMood('thinking')
-            setCustomSpeech(analysis.cat_speech)
-            setScreenAlertData(analysis)
-            setShowSpeech(true)
-            playCompanionChime('nudge')
-          } else if (analysis.detected && analysis.is_coding_context) {
-            // Coding smoothly
-            setScreenAlertData(analysis)
-            if (!customSpeech) {
-              setCustomSpeech(analysis.cat_speech)
-              setShowSpeech(true)
-            }
+          }
+        } else {
+          console.warn('[Screen Watcher] Analysis response:', res)
+          if (!res.success) {
+            setCustomSpeech(`⚠️ Connecting to backend (${res.error}). Retrying...`)
+          } else if (res.data.status === 'error') {
+            setCustomSpeech(res.data.analysis?.cat_speech || 'Purr... My vision got fuzzy. Retrying in 25s! 🐾')
           }
         }
       } catch (err) {
         console.error('[Screen Watcher] Analysis error:', err)
+        setCustomSpeech('⚠️ Screen analysis error. Retrying in 25s...')
       } finally {
         setIsAnalyzing(false)
       }
     },
-    [isAnalyzing, customSpeech]
+    [isAnalyzing, bubbleMode]
   )
 
   // Toggle Screen Watch Mode
@@ -187,7 +145,7 @@ export default function App() {
     const nextWatching = !isWatching
     setIsWatching(nextWatching)
     if (nextWatching) {
-      setCustomSpeech('Screen Watch ON! 👁️ I will watch your code, alert on wrong test cases & nudge if stuck.')
+      setCustomSpeech('Continuous Screen Watch ON! 👁️ Inspecting screen every 25s.')
       setShowSpeech(true)
       setTimeout(() => performScreenAnalysis(false), 500)
     } else {
@@ -197,37 +155,66 @@ export default function App() {
     }
   }
 
-  // Periodic Watcher Interval with OS-level cursor idle detection
+  // Continuous 25-second Screen Analysis Interval
   useEffect(() => {
     if (!isWatching) return
 
-    // Perform an initial scan after mount
+    // Perform an initial scan 1.2 seconds after launch
     const initialTimer = setTimeout(() => {
       performScreenAnalysis(false)
-    }, 2000)
+    }, 1200)
 
-    const interval = setInterval(async () => {
-      let idleSeconds = 0
-      if (window.electronAPI?.getDesktopIdleSeconds) {
-        try {
-          idleSeconds = await window.electronAPI.getDesktopIdleSeconds()
-        } catch {
-          idleSeconds = Math.round((Date.now() - lastActiveTimestampRef.current) / 1000)
-        }
-      } else {
-        idleSeconds = Math.round((Date.now() - lastActiveTimestampRef.current) / 1000)
-      }
-
-      // If user hasn't moved cursor across OS for 45+ seconds, trigger idle check
-      const isIdle = idleSeconds >= 45
-      performScreenAnalysis(isIdle)
-    }, 18000)
+    // Run screen analysis continuously every 25 seconds
+    const interval = setInterval(() => {
+      performScreenAnalysis(false)
+    }, 25000)
 
     return () => {
       clearTimeout(initialTimer)
       clearInterval(interval)
     }
   }, [isWatching, performScreenAnalysis])
+
+  // Request a hint in the text bubble (does NOT open the panel)
+  const handleGetHint = () => {
+    setBubbleMode('hint')
+    if (screenAlertData?.detailed_hint) {
+      setCustomSpeech(`💡 ${screenAlertData.detailed_hint}`)
+    } else {
+      setCustomSpeech('🐾 Inspecting your screen for a helpful hint...')
+      performScreenAnalysis(false)
+    }
+    setShowSpeech(true)
+    playCompanionChime('nudge')
+  }
+
+  // Switch back to live screen commentary in the text bubble
+  const handleShowObservation = () => {
+    setBubbleMode('observation')
+    if (screenAlertData?.cat_speech) {
+      setCustomSpeech(screenAlertData.cat_speech)
+    } else {
+      setCustomSpeech(null)
+    }
+  }
+
+  // Pet the cat: purrs and updates text bubble with playful remarks
+  const handlePetCat = () => {
+    setPetCount((prev) => {
+      const nextCount = prev + 1
+      const petPurrs = [
+        `Purr... Petted ${nextCount} times! 😸`,
+        'Meow! Feeling sharp and ready to code! 🐾',
+        'Purrrrr! Watching your screen closely! 🐱',
+        'Warm paws! Keep solving those problems! ✨',
+      ]
+      setCustomSpeech(petPurrs[nextCount % petPurrs.length])
+      return nextCount
+    })
+    setShowSpeech(true)
+    setMood('success')
+    playCompanionChime('nudge')
+  }
 
   // Listen to IPC updates from native context menu
   useEffect(() => {
@@ -244,7 +231,7 @@ export default function App() {
     }
   }, [])
 
-  // Toggle Assistant Panel expansion
+  // Toggle Assistant Panel expansion (reserved specifically for verifying code)
   const toggleExpanded = (expand?: boolean) => {
     const nextExpanded = expand !== undefined ? expand : !isExpanded
     setIsExpanded(nextExpanded)
@@ -255,8 +242,6 @@ export default function App() {
 
   // Cycle mood directly
   const cycleMood = () => {
-    setCustomSpeech(null)
-    setShowSpeech(true)
     setPetCount((prev) => prev + 1)
     const moodOrder: CatMood[] = ['idle', 'thinking', 'helping', 'success']
     const nextIndex = (moodOrder.indexOf(mood) + 1) % moodOrder.length
@@ -306,22 +291,32 @@ export default function App() {
         <div className="floating-toolbar">
           <button
             type="button"
-            className={`mini-btn chat-btn ${isExpanded ? 'active' : ''}`}
-            onPointerDown={() => toggleExpanded()}
+            className={`mini-btn verify-panel-btn ${isExpanded ? 'active' : ''}`}
             onClick={() => toggleExpanded()}
-            title={isExpanded ? 'Collapse Panel' : 'Open DSA Assistant Panel'}
+            title={
+              isExpanded
+                ? 'Collapse Code Verification Panel'
+                : 'Open Code Verification Panel: Paste your code to verify & explain'
+            }
           >
-            {isExpanded ? '▼' : '💬'}
+            {isExpanded ? '▼' : '📝'}
+          </button>
+          <button
+            type="button"
+            className={`mini-btn hint-tool-btn ${bubbleMode === 'hint' ? 'active' : ''}`}
+            onClick={handleGetHint}
+            title="Get Socratic Hint in Text Bubble"
+          >
+            💡
           </button>
           <button
             type="button"
             className={`mini-btn watch-btn ${isWatching ? 'active' : ''} ${isAnalyzing ? 'analyzing' : ''}`}
-            onPointerDown={toggleWatchMode}
             onClick={toggleWatchMode}
             title={
               isWatching
-                ? 'Screen Watcher: ACTIVE (Monitoring desktop for wrong test cases & idle stuck state)'
-                : 'Turn ON Screen Watcher (Byte watches your code & test results)'
+                ? 'Continuous Screen Watcher: ACTIVE (Analyzes screen every 25s)'
+                : 'Turn ON Continuous Screen Watcher'
             }
           >
             {isAnalyzing ? '🔄' : isWatching ? '👁️' : '🕶️'}
@@ -329,17 +324,15 @@ export default function App() {
           <button
             type="button"
             className={`mini-btn scan-btn ${isAnalyzing ? 'analyzing' : ''}`}
-            onPointerDown={() => performScreenAnalysis(false)}
             onClick={() => performScreenAnalysis(false)}
             disabled={isAnalyzing}
-            title="📸 Scan Screen Now: Immediately inspect desktop code and testcases"
+            title="📸 Scan Screen Now: Immediately inspect desktop code"
           >
             📸
           </button>
           <button
             type="button"
             className="mini-btn"
-            onPointerDown={cycleMood}
             onClick={cycleMood}
             title={`Mood: ${mood} (Click to pet Byte)`}
           >
@@ -348,7 +341,6 @@ export default function App() {
           <button
             type="button"
             className={`mini-btn pin ${isAlwaysOnTop ? 'active' : ''}`}
-            onPointerDown={toggleAlwaysOnTop}
             onClick={toggleAlwaysOnTop}
             title={isAlwaysOnTop ? 'Always on Top: ON' : 'Always on Top: OFF'}
           >
@@ -357,7 +349,6 @@ export default function App() {
           <button
             type="button"
             className="mini-btn"
-            onPointerDown={handleMinimize}
             onClick={handleMinimize}
             title="Minimize to taskbar"
           >
@@ -366,7 +357,6 @@ export default function App() {
           <button
             type="button"
             className="mini-btn close"
-            onPointerDown={handleClose}
             onClick={handleClose}
             title="Quit Companion"
           >
@@ -374,11 +364,13 @@ export default function App() {
           </button>
         </div>
 
-        {/* Floating Speech Bubble with Alert Highlighting */}
+        {/* Floating Speech Bubble with Hint Button and Continuous Commentary */}
         {showSpeech && (
           <div
             className={`speech-bubble ${
-              screenAlertData?.has_error
+              bubbleMode === 'hint'
+                ? 'is-hint'
+                : screenAlertData?.has_error
                 ? 'has-alert'
                 : screenAlertData?.is_accepted
                 ? 'has-success'
@@ -386,42 +378,80 @@ export default function App() {
                 ? 'has-nudge'
                 : ''
             }`}
-            onClick={() => toggleExpanded(true)}
-            title="Click to view details and hints in Assistant"
           >
-            {screenAlertData?.has_error && (
+            {bubbleMode === 'hint' ? (
+              <div className="bubble-badge hint">
+                <span>💡 SOCRATIC HINT</span>
+              </div>
+            ) : screenAlertData?.has_error ? (
               <div className="bubble-badge alert">
-                <span>🚨 WRONG TEST CASE DETECTED</span>
+                <span>🚨 TEST CASE FAILED</span>
               </div>
-            )}
-            {screenAlertData?.is_stuck && !screenAlertData?.has_error && (
-              <div className="bubble-badge nudge">
-                <span>💡 STUCK DETECTOR HINT</span>
-              </div>
-            )}
-            {screenAlertData?.is_accepted && (
+            ) : screenAlertData?.is_accepted ? (
               <div className="bubble-badge success">
-                <span>🎉 TEST CASES ACCEPTED!</span>
+                <span>🎉 CODE ACCEPTED!</span>
+              </div>
+            ) : screenAlertData?.is_stuck ? (
+              <div className="bubble-badge nudge">
+                <span>💡 NUDGE</span>
+              </div>
+            ) : screenAlertData?.problem_name &&
+              screenAlertData.problem_name !== 'No Problem Detected' &&
+              screenAlertData.problem_name !== 'Analysis Error' ? (
+              <div className="bubble-badge topic">
+                <span>👀 {screenAlertData.problem_name}</span>
+              </div>
+            ) : (
+              <div className="bubble-badge live">
+                <span>🐾 LIVE WATCH (25s)</span>
               </div>
             )}
+
             <div className="bubble-text">{activeSpeechText}</div>
-            {(screenAlertData?.has_error || screenAlertData?.detailed_hint) && (
-              <div className="bubble-cta">Click for Byte's hint ➜</div>
-            )}
+
+            {/* Bubble Action Buttons: Get Hint & Verify Code */}
+            <div className="bubble-actions">
+              {bubbleMode === 'observation' ? (
+                <button
+                  type="button"
+                  className="bubble-action-btn hint-btn"
+                  onClick={handleGetHint}
+                  title="Speak a Socratic hint in this text bubble"
+                >
+                  💡 Get Hint
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="bubble-action-btn live-btn"
+                  onClick={handleShowObservation}
+                  title="Return to continuous live screen commentary"
+                >
+                  👁️ Live Screen
+                </button>
+              )}
+              <button
+                type="button"
+                className="bubble-action-btn verify-btn"
+                onClick={() => toggleExpanded(true)}
+                title="Paste code into panel to verify correctness & get explanations"
+              >
+                📝 Verify Code
+              </button>
+            </div>
           </div>
         )}
 
-        {/* The Animated Draggable Cat */}
+        {/* The Animated Draggable Cat (Clicking pets Byte!) */}
         <div
           className="cat-area"
-          onDoubleClick={() => toggleExpanded()}
-          title="Drag the cat anywhere! Double-click to toggle Assistant."
+          title="Byte the Cat (Drag anywhere! Click to pet Byte)"
         >
-          <FloatingCat mood={mood} onCatClick={() => toggleExpanded()} />
+          <FloatingCat mood={mood} onCatClick={handlePetCat} />
         </div>
       </div>
 
-      {/* 2. Assistant Panel (Opens directly below the cat!) */}
+      {/* 2. Assistant Panel (Opens only when user clicks Verify Code) */}
       {isExpanded && (
         <div className="panel-section">
           <AssistantPanel

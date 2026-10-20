@@ -1015,6 +1015,58 @@
   opacity: 0.8;
 }
 
+/* Dedicated Verify & Explain Action Strip */
+.drawer-verify-strip {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.drawer-verify-btn {
+  flex: 1;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  transition: all 0.15s ease;
+  border: 1px solid transparent;
+}
+
+.drawer-verify-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  filter: grayscale(0.5);
+}
+
+.drawer-verify-btn.explain {
+  background: linear-gradient(135deg, #4f46e5, #6366f1);
+  color: #ffffff;
+  box-shadow: 0 2px 10px rgba(99, 102, 241, 0.35);
+}
+
+.drawer-verify-btn.explain:hover:not(:disabled) {
+  background: linear-gradient(135deg, #4338ca, #4f46e5);
+  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.5);
+  transform: translateY(-1px);
+}
+
+.drawer-verify-btn.debug {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #fca5a5;
+}
+
+.drawer-verify-btn.debug:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.28);
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
 /* Toggle Code Button in Input Bar */
 .toggle-code-btn {
   -webkit-app-region: no-drag;

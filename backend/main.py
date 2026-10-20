@@ -92,7 +92,7 @@ def get_ai_status():
     return AIStatusResponse(
         configured=client is not None,
         provider="Google Gemini",
-        model=os.getenv("GEMINI_MODEL", "gemini-3.8-flash"),
+        model=os.getenv("GEMINI_MODEL", "gemini-flash-lite-latest"),
     )
 
 
@@ -111,8 +111,9 @@ def configure_api_key(req: ConfigureKeyRequest):
     # Persist to backend/.env file
     env_path = Path(__file__).parent / ".env"
     try:
+        current_model = os.getenv("GEMINI_MODEL", "gemini-flash-lite-latest")
         with open(env_path, "w", encoding="utf-8") as f:
-            f.write(f"# Auto-configured by DSA Companion\nGEMINI_API_KEY={key}\nGEMINI_MODEL=gemini-3.8-flash\n")
+            f.write(f"# Auto-configured by DSA Companion\nGEMINI_API_KEY={key}\nGEMINI_MODEL={current_model}\n")
     except Exception as e:
         print(f"[Backend] Warning saving .env: {e}")
 
@@ -171,4 +172,4 @@ def handle_analyze_screen(req: AnalyzeScreenRequest):
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
+    uvicorn.run("main:app", host="127.0.0.1", port=8765, reload=True)

@@ -86,6 +86,41 @@ def get_gemini_client():
         return None
 
 
+def call_gemini_with_fallback(client, contents, config=None):
+    """
+    Calls Gemini generate_content with automatic fallback across models
+    if quota exhaustion (429), 404, or 503 occurs.
+    """
+    configured_model = os.getenv("GEMINI_MODEL", "gemini-flash-lite-latest").strip()
+    candidate_models = [configured_model]
+    for fallback in ["gemini-flash-lite-latest", "gemini-flash-latest", "gemini-3.8-flash"]:
+        if fallback not in candidate_models:
+            candidate_models.append(fallback)
+
+    last_err = None
+    for model_name in candidate_models:
+        try:
+            kwargs = {}
+            if config is not None:
+                kwargs["config"] = config
+            response = client.models.generate_content(
+                model=model_name,
+                contents=contents,
+                **kwargs,
+            )
+            return response, model_name
+        except Exception as err:
+            err_str = str(err)
+            last_err = err
+            print(f"[AI Engine] Model '{model_name}' fallback triggered: {err_str[:90]}")
+            if any(term in err_str for term in ["429", "RESOURCE_EXHAUSTED", "404", "NOT_FOUND", "503", "UNAVAILABLE"]):
+                continue
+            raise err
+
+    if last_err:
+        raise last_err
+
+
 def generate_dsa_assistance(
     prompt: str,
     mode: str,
@@ -99,7 +134,6 @@ def generate_dsa_assistance(
     Accepts student prompt, assistance level, code snippet, and error trace.
     """
     client = get_gemini_client()
-    model_name = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
 
     # Format user content with optional code and error trace
     content_parts = [prompt]
@@ -142,8 +176,8 @@ def generate_dsa_assistance(
     )
 
     try:
-        response = client.models.generate_content(
-            model=model_name,
+        response, used_model = call_gemini_with_fallback(
+            client=client,
             contents=final_prompt,
             config={
                 "system_instruction": system_instruction,
@@ -155,7 +189,7 @@ def generate_dsa_assistance(
             "status": "success",
             "response": response.text or "Purr... I couldn't generate a response. Please try rephrasing your question!",
             "source": "gemini-ai",
-            "model": model_name,
+            "model": used_model,
         }
     except Exception as err:
         err_str = str(err)
@@ -173,14 +207,15 @@ def generate_dsa_assistance(
             "status": "error",
             "response": friendly_msg,
             "source": "gemini-error",
-            "model": model_name,
+            "model": os.getenv("GEMINI_MODEL", "gemini-flash-lite-latest"),
         }
 
 
 def analyze_screen_dsa(image_base64: str, is_idle_check: bool = False) -> dict:
     """
-    Multimodal visual inspection of the user's desktop screenshot using Gemini 3.8 Flash.
-    Detects if the user is coding, on LeetCode/IDE, has a failed testcase, or is stuck/idle.
+    Multimodal visual inspection of the user's desktop screenshot using Gemini Vision.
+    Runs every 10 seconds to continuously tell the user observations about their screen,
+    and prepares a Socratic hint to be spoken directly in their text bubble when requested.
     """
     client = get_gemini_client()
     if not client:
@@ -191,7 +226,7 @@ def analyze_screen_dsa(image_base64: str, is_idle_check: bool = False) -> dict:
                 "is_coding_context": False,
                 "has_error": False,
                 "is_stuck": False,
-                "is_accepted": False,
+                "is_accepted": false,
                 "problem_name": "No Problem Detected",
                 "error_type": "None",
                 "error_summary": "",
@@ -220,35 +255,34 @@ def analyze_screen_dsa(image_base64: str, is_idle_check: bool = False) -> dict:
         image_part = types.Part.from_bytes(data=image_bytes, mime_type="image/png")
 
         idle_context = (
-            "NOTE: The student has been on this screen without typing or cursor movement for over 60 seconds (they may be stuck, staring at code, or taking too long with their current logic)."
+            "NOTE: The student has been inactive on this screen for a bit (may be stuck, staring at code, or contemplating logic)."
             if is_idle_check
             else ""
         )
 
-        prompt = f"""You are Byte the Cat 🐱, an AI DSA Coding Companion watching over a student's desktop while they code.
+        prompt = f"""You are Byte the Cat 🐱, an attentive AI DSA Coding Companion sitting on the student's desktop, watching their screen in real time.
+You analyze their screen every 25 seconds and tell them something live and relevant based on what's visible right now!
 {idle_context}
 
-Analyze this desktop screenshot carefully:
-1. Is a coding editor (VS Code, Cursor, IntelliJ, terminal, IDE) or LeetCode / HackerRank / NeetCode / DSA problem visible?
-2. Has a test case or execution failed? Look specifically for:
-   - 'Wrong Answer', 'Time Limit Exceeded' (TLE), 'Runtime Error', 'Memory Limit Exceeded', 'Compilation Error', red testcase indicators, diffs between Expected vs Output, or stack traces.
-3. Has the student's solution been accepted? Look for green 'Accepted', 'Passed', all test cases passing.
-4. If they have been idle or taking too long:
-   - Are they staring at an unfinished function or complex loop?
-   - Formulate a gentle Socratic nudge to unblock them.
-5. Identify the problem name or algorithm topic if visible (e.g. 'Two Sum', 'Valid Parentheses', 'LRU Cache', 'Merge Intervals', 'Binary Search').
+Carefully inspect the desktop screenshot:
+1. Is an IDE, text editor, terminal, or DSA platform (LeetCode, HackerRank, Codeforces, NeetCode, etc.) visible?
+2. What specific problem, topic, or algorithm are they working on? (e.g. 'Two Sum', 'Binary Search', 'Valid Parentheses', 'Merge Intervals', 'LRU Cache', or topic like Trees, Graphs, Dynamic Programming).
+3. What is the user actively doing right now?
+   - Reading the problem / constraints? (Comment on constraints like N <= 10^5 or target time complexity).
+   - Writing code? (Comment on what data structure, pointer, loop, variable, or logic they are writing).
+   - Looking at test cases or running a test?
+     - Has a test case failed? Look for 'Wrong Answer', 'Time Limit Exceeded', 'Runtime Error', red indicators, output vs expected diffs.
+     - Has the code been Accepted? Look for green 'Accepted', 'Passed', all tests passed.
+   - Staring / idle? (Notice what line they might be thinking about).
+   - If not on a coding window (e.g. browser, desktop, discord)? (Give a playful, cute cat remark nudging them to code or acknowledging what they are doing).
 
-Generate structured guidance:
-- "cat_speech": A short, punchy 1-2 sentence speech bubble message (with friendly cat emojis like 🐾, 💡, 🐱, 🚨) to display directly above Byte the Cat on their desktop.
-  - If a test case failed: Acknowledge the failure with empathy and point to the possible edge case or mistake (e.g. "🚨 Wrong Answer on testcase 3! Did you handle duplicate numbers? Click me for a hint! 🐾").
-  - If taking too long / stuck: Offer a gentle nudge (e.g. "💡 Pondering that loop condition? Take a breath! Click me for a quick Level 1 hint. 🐾").
-  - If accepted: Celebrate warmly (e.g. "🎉 Accepted! All test cases passed! You crushed it! 😸✨").
-  - If coding smoothly: A quick supportive remark (e.g. "👀 Watching your code... looking sharp! Keep going! 🐾").
-  - If not on a coding window: "Meow! Open LeetCode or your code editor and I'll watch your back! 🐾"
-- "detailed_hint": 2-3 sentences of clear, pedagogical Socratic guidance. Explain WHY the edge case fails or what conceptual pattern applies, without dumping the complete code solution.
-- "error_summary": If a test failed, provide a concise summary (e.g., "Wrong Answer: Expected [0,1], Got [1,1] on input nums=[3,3], target=6").
-- "suggested_prompt": A 1-sentence prompt the student can click to instantly ask Byte in the assistant chat (e.g., "Why did my solution fail on duplicate inputs?").
-- "mood": "helping" if error/wrong test case, "thinking" if stuck/pondering, "success" if accepted, or "idle".
+Generate structured output:
+- "cat_speech": 1-2 short, punchy, conversational sentences for Byte's floating speech text bubble (using playful cat emojis like 🐾, 💡, 🐱, 🚨, ✨).
+  CRITICAL: Make the speech SPECIFIC to what is seen on screen right now! Do not be generic. Mention the problem name, loop, variable, testcase, or constraint!
+- "detailed_hint": 2-3 sentences of clear, pedagogical Socratic guidance. If the user clicks the "Get Hint" button on the text bubble, this exact hint will be spoken in Byte's text bubble! Give intuition, edge case warnings, or algorithmic pointers without spoiling the full solution code.
+- "error_summary": Short summary of any failed testcase (or empty string if none).
+- "suggested_prompt": A prompt to explain or verify code if they open the panel (e.g., "Explain how to fix my binary search edge case").
+- "mood": "helping" if error/failing test, "thinking" if thinking/stuck, "success" if accepted, or "idle".
 
 Respond ONLY with valid JSON in this exact structure:
 {{
@@ -259,31 +293,40 @@ Respond ONLY with valid JSON in this exact structure:
   "is_accepted": false,
   "problem_name": "Problem Title or Topic",
   "error_type": "Wrong Answer / TLE / Runtime Error / Compilation Error / None",
-  "error_summary": "Concise summary of failing input/output or error",
+  "error_summary": "Concise summary of failing test case",
   "mood": "helping / thinking / success / idle",
-  "cat_speech": "Short speech bubble message here",
-  "detailed_hint": "Detailed pedagogical hint for the assistant panel",
-  "suggested_prompt": "Suggested question for chat"
+  "cat_speech": "Short, specific speech bubble text here",
+  "detailed_hint": "Socratic hint to display in text bubble when user clicks Get Hint",
+  "suggested_prompt": "Suggested verification prompt"
 }}
 """
 
-        model_name = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
-        response = client.models.generate_content(
-            model=model_name,
+        response, used_model = call_gemini_with_fallback(
+            client=client,
             contents=[image_part, prompt],
             config={
                 "response_mime_type": "application/json",
-                "temperature": 0.2,
+                "temperature": 0.25,
             },
         )
 
         raw_text = (response.text or "{}").strip()
+        if "```" in raw_text:
+            cleaned_lines = [
+                line for line in raw_text.splitlines()
+                if not line.strip().startswith("```")
+            ]
+            raw_text = "\n".join(cleaned_lines).strip()
+
         parsed = json.loads(raw_text)
+        speech = parsed.get("cat_speech", "")
+        problem = parsed.get("problem_name", "")
+        print(f"[AI Vision Observation] Problem: {problem} | Speech: {speech}")
 
         return {
             "status": "success",
             "analysis": parsed,
-            "model": model_name,
+            "model": used_model,
         }
     except Exception as e:
         print(f"[AI Vision Error]: {e}")
@@ -300,7 +343,7 @@ Respond ONLY with valid JSON in this exact structure:
                 "error_type": "None",
                 "error_summary": "",
                 "mood": "idle",
-                "cat_speech": "Purr... My vision got a bit fuzzy! Try again in a moment. 🐾",
+                "cat_speech": "Purr... My vision got a bit fuzzy! Watching your screen again in 25s. 🐾",
                 "detailed_hint": f"Vision analysis encountered an issue: {e}",
                 "suggested_prompt": "Help me with my code",
             },

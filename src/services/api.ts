@@ -1,6 +1,6 @@
 import type { AssistantMode, AssistanceLevel } from '../types/assistant'
 
-const BACKEND_URL = 'http://127.0.0.1:8000'
+const BACKEND_URL = 'http://127.0.0.1:8765'
 
 export interface BackendHealth {
   status: string

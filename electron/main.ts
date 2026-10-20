@@ -43,7 +43,7 @@ function startPythonBackend() {
   try {
     pythonProcess = spawn(
       pythonPath,
-      ['-m', 'uvicorn', 'main:app', '--host', '127.0.0.1', '--port', '8000'],
+      ['-m', 'uvicorn', 'main:app', '--host', '127.0.0.1', '--port', '8765'],
       {
         cwd: backendDir,
         env: { ...process.env, PYTHONUNBUFFERED: '1', PYTHONIOENCODING: 'utf-8' },
@@ -80,8 +80,8 @@ function createWindow() {
   const primaryDisplay = screen.getPrimaryDisplay()
   const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize
 
-  const windowWidth = 220
-  const windowHeight = 250
+  const windowWidth = 260
+  const windowHeight = 270
 
   // Position at bottom-right corner of the desktop
   const initialX = Math.max(0, screenWidth - windowWidth - 30)
@@ -159,8 +159,8 @@ ipcMain.on('window-set-expanded', (_event, isExpanded: boolean) => {
   const primaryDisplay = screen.getPrimaryDisplay()
   const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize
 
-  const compactWidth = 220
-  const compactHeight = 240
+  const compactWidth = 260
+  const compactHeight = 270
   const expandedWidth = 400
   const expandedHeight = 680
 

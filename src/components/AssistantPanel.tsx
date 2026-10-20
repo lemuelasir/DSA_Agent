@@ -131,8 +131,8 @@ export const AssistantPanel: React.FC<AssistantPanelProps> = ({
   const [backendInfo, setBackendInfo] = useState<BackendHealth | null>(null)
   const [aiStatus, setAiStatus] = useState<AIStatusResponse | null>(null)
 
-  // Code Workbench Drawer states
-  const [showCodeDrawer, setShowCodeDrawer] = useState<boolean>(false)
+  // Code Workbench Drawer states (opened by default for code verification)
+  const [showCodeDrawer, setShowCodeDrawer] = useState<boolean>(true)
   const [codeSnippet, setCodeSnippet] = useState<string>('')
   const [codeLanguage, setCodeLanguage] = useState<string>('python')
   const [errorInput, setErrorInput] = useState<string>('')
@@ -822,6 +822,34 @@ export const AssistantPanel: React.FC<AssistantPanelProps> = ({
               onChange={(e) => setErrorInput(e.target.value)}
               placeholder="Paste error message, runtime exception, or test failure (optional)..."
             />
+          </div>
+
+          {/* Dedicated Verify & Explain Action Strip */}
+          <div className="drawer-verify-strip">
+            <button
+              type="button"
+              className="drawer-verify-btn explain"
+              disabled={isLoading || !codeSnippet.trim()}
+              onClick={() => {
+                setActiveMode('learn')
+                handleSendMessage('Please verify this code, explain its logic step-by-step, review edge cases, and analyze Big-O complexity.')
+              }}
+              title="Verify correctness & explain code step-by-step"
+            >
+              ✨ Explain & Verify Code
+            </button>
+            <button
+              type="button"
+              className="drawer-verify-btn debug"
+              disabled={isLoading || !codeSnippet.trim()}
+              onClick={() => {
+                setActiveMode('debug')
+                handleSendMessage('Please analyze this code and identify any bugs, boundary errors, or logical mistakes.')
+              }}
+              title="Debug this code snippet"
+            >
+              🐛 Find Bugs / Debug
+            </button>
           </div>
         </section>
       )}
